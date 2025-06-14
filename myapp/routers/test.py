@@ -3,6 +3,7 @@ from fastapi.responses import StreamingResponse, HTMLResponse
 from pydantic import BaseModel
 import json
 import asyncio
+import random
 
 router = APIRouter()
 
@@ -144,3 +145,13 @@ async def sse(request: Request):
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@router.get("/test/Concurrency", tags=["测试"], summary="测试并发")
+async def high_concurrency():
+    """
+    测试并发
+    """
+
+    await asyncio.sleep(random.uniform(0, 1))
+    return {"user_id": "the current user"}

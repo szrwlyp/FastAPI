@@ -1,5 +1,5 @@
 from fastapi import FastAPI, WebSocket
-from .routers import users, test
+from .routers import users, test, fileUpload, chat
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.staticfiles import StaticFiles
@@ -49,6 +49,8 @@ app.add_middleware(
 # 路由文件
 app.include_router(users.router)
 app.include_router(test.router)
+app.include_router(fileUpload.router)
+app.include_router(chat.router)
 
 
 html = """
