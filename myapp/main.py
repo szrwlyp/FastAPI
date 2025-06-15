@@ -1,18 +1,29 @@
-from fastapi import FastAPI, WebSocket
-from .routers import users, test, fileUpload, chat
+from fastapi import FastAPI, WebSocket,Query,WebSocketDisconnect
+from .routers import users, test, fileUpload
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 import os.path
+from pydantic import BaseModel
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import PlainTextResponse, HTMLResponse
 import asyncio
+import json
+import time
 
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.header import Header
+
+from .connection_manager import ConnectionManager  # 导入连接管理器
+import logging
+
+# 配置日志
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("fastapi")
+
 
 app = FastAPI(docs_url=None)
 
@@ -50,7 +61,7 @@ app.add_middleware(
 app.include_router(users.router)
 app.include_router(test.router)
 app.include_router(fileUpload.router)
-app.include_router(chat.router)
+# app.include_router(chat.router) //大模型
 
 
 html = """
@@ -134,16 +145,112 @@ def send_email():
         server.quit()
 
 
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    while True:
+manager = ConnectionManager()  # 创建连接管理器实例
 
-        await asyncio.sleep(3)
-        await websocket.send_text("Hello, FastAPI!")
-        # 每秒钟发送一次数据
-        # data = await websocket.receive_text()
-        # await websocket.send_text(f"Message text was: {data}")
+@app.websocket("/ws")
+async def websocket_endpoint(
+    websocket: WebSocket,
+    username: str = Query(..., description="用户唯一标识")
+):
+    """
+    WebSocket 聊天端点
+    - username: 用户唯一标识（字符串）
+    """
+    # 1. 连接用户
+    await manager.connect(username, websocket)
+    logger.info(f"用户 {username} 已连接")
+    
+    # 2. 启动心跳任务
+    # heartbeat_task = asyncio.create_task(manager.heartbeat(username))
+    
+    try:
+        while True:
+            # 3. 接收消息
+            data = await websocket.receive_json()
+            logger.debug(f"收到来自 {username} 的消息: {data}")
+            
+            # 4. 更新用户活跃时间
+            manager.last_active[username] = time.time()
+            
+            # 5. 处理心跳响应
+            if data.get("type") == "ping":
+                # 发送pong响应
+                await websocket.send_json({
+                    "type": "ping",
+                    "name": "system",
+                    "target_user": username,
+                    "message_content": "",
+                    "timestamp": time.time()
+                })
+                continue
+            
+            # 6. 处理聊天消息
+            # if data.get("type") == "video-offer" and "target_user" in data and "message_content" in data:
+            
+            # 添加发送者信息
+            data["name"] = username
+            data["timestamp"] = time.time()
+            
+            # 发送消息给目标用户
+            success = await manager.send_message(data)
+            
+            if not success:
+                # 如果目标用户不在线，通知发送者
+                await websocket.send_json({
+                    "type": "error",
+                    "name": "system",
+                    "target_user": username,
+                    "message_content": f"用户 {data['target_user']} 不在线",
+                    "timestamp": time.time()
+                })
+                
+                # 同时发送回发送者（实现消息回显）
+                # await websocket.send_json({
+                #     "type": "message",
+                #     "name": "你",
+                #     "target_user": username,
+                #     "message_content": f"你 -> {data['target_user']}: {data['message_content']}",
+                #     "timestamp": time.time()
+                # })
+            # else:
+            #     # 无效消息格式
+            #     await websocket.send_json({
+            #         "type": "error",
+            #         "name": "system",
+            #         "target_user": username,
+            #         "message_content": "无效消息格式，请包含 type, target_user, message_content 字段",
+            #         "timestamp": time.time()
+            #     })
+                
+    except WebSocketDisconnect:
+        # 7. 处理断开连接
+        await manager.disconnect(username)
+        logger.info(f"用户 {username} 已断开连接")
+    except Exception as e:
+        logger.error(f"用户 {username} 连接异常: {e}")
+        await manager.disconnect(username)
+    finally:
+        # 取消心跳任务
+        # heartbeat_task.cancel()
+        logger.info(f"用户 {username} 的心跳任务已停止")
+
+
+# @app.websocket("/ws")
+# async def websocket_endpoint(websocket: WebSocket):
+#     await websocket.accept()
+#     while True:
+
+#         await asyncio.sleep(3)
+#         await websocket.send_text(json.dumps({
+#             "type": "test",
+#             "name": "lanyuping",
+#             "target" : "lisi",
+#             "content": 'aaa',
+#         }))
+#         # 每秒钟发送一次数据
+#         data = await websocket.receive_text()
+#         print(f"Message received: {data}")  # 打印接收到的数据
+#         # await websocket.send_text(f"Message text was: {data}")
 
 
 # if __name__ == "__main__":
