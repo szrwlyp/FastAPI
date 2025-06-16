@@ -1,7 +1,7 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Path
 from pydantic import BaseModel, HttpUrl
 from typing import List
-
+from ..logger import logger #日志
 router = APIRouter()
 
 
@@ -82,5 +82,5 @@ async def create_multiple_images(images: list[Image]):
     """
 
     for image in images:
-        print(image.name)
+        logger.info(image.name)
     return images

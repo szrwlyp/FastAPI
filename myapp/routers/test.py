@@ -4,6 +4,7 @@ from pydantic import BaseModel
 import json
 import asyncio
 import random
+from ..logger import logger #日志
 
 router = APIRouter()
 
@@ -119,9 +120,9 @@ async def sse(request: Request):
 
     try:
         json_data = await request.json()
-        print("JSON Data:", sseItem(**json_data).question)
+        logger.info("JSON Data:", sseItem(**json_data).question)
     except Exception as e:
-        print("JSON Data Error:", str(e))  # 如果不是 JSON 类型会报错
+        logger.error("JSON Data Error:", str(e))  # 如果不是 JSON 类型会报错
 
     async def event_stream():
         try:
@@ -132,8 +133,8 @@ async def sse(request: Request):
                 # if event_dict["event"] == "complete":
                 #     break
         except asyncio.CancelledError as e:
-            print("SSE connection was closed by the client.")
-            print(e)
+            logger.error("SSE connection was closed by the client.")
+            logger.info(e)
             raise e
 
     return StreamingResponse(

@@ -1,18 +1,15 @@
 from fastapi import APIRouter,WebSocket,Query,WebSocketDisconnect
 from .connection_manager import ConnectionManager  # 导入连接管理器
-import logging
 import time
 import asyncio
 import json
+
+from ..logger import logger #日志
 
 router = APIRouter()
 
 
 manager = ConnectionManager()  # 创建连接管理器实例
-
-# 配置日志
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("fastapi")
 
 @router.websocket("/ws")
 async def websocket_endpoint(
@@ -34,16 +31,12 @@ async def websocket_endpoint(
         while True:
             # 接收消息
             data = await websocket.receive_json()
-            logger.debug(f"收到来自 {username} 的消息: {data}")
-            
-            # 4. 更新用户活跃时间
-            manager.last_active[username] = time.time()
-            
-            # 5. 处理心跳响应
+        
+            # 处理心跳响应
             if data.get("type") == "ping":
                 # 发送pong响应
                 await websocket.send_json({
-                    "type": "ping",
+                    "type": "pong",
                     "name": "system",
                     "target_user": username,
                     "message_content": "",
@@ -51,9 +44,11 @@ async def websocket_endpoint(
                 })
                 continue
             
-            # 6. 处理聊天消息
-            # if data.get("type") == "video-offer" and "target_user" in data and "message_content" in data:
+            logger.debug(f"收到来自 {username} 的消息: {data}")
             
+            # 更新用户活跃时间
+            manager.last_active[username] = time.time()
+
             # 添加发送者信息
             data["name"] = username
             data["timestamp"] = time.time()
@@ -98,6 +93,6 @@ async def websocket_endpoint(websocket: WebSocket):
         }))
         # 每秒钟发送一次数据
         data = await websocket.receive_text()
-        print(f"Message received: {data}")  # 打印接收到的数据
+        logger.info(f"Message received: {data}")  # 打印接收到的数据
         # await websocket.send_text(f"Message text was: {data}")
 

@@ -3,6 +3,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.header import Header
+from ..logger import logger #日志
 
 router = APIRouter();
 
@@ -40,8 +41,8 @@ async def sendEmail():
 
         # 发送邮件
         server.sendmail(username, [recipient], message.as_string())
-        print("邮件发送成功")
+        logger.info("邮件发送成功")
     except Exception as e:
-        print(f"邮件发送失败：{e}")
+        logger.error(f"邮件发送失败：{e}")
     finally:
         server.quit()

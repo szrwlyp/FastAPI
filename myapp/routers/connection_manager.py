@@ -3,6 +3,7 @@ import json
 import time
 from typing import Dict, List, Optional
 from fastapi import WebSocket
+from ..logger import logger #日志
 
 class ConnectionManager:
     """
@@ -23,10 +24,9 @@ class ConnectionManager:
         await websocket.accept()
         self.active_connections[username] = websocket
         self.last_active[username] = time.time()
-        print(f"用户 {username} 已连接")
         
         # 发送离线消息
-        await self._deliver_offline_messages(username)
+        # await self._deliver_offline_messages(username)
         
         return True
 
@@ -36,7 +36,7 @@ class ConnectionManager:
             del self.active_connections[username]
         if username in self.last_active:
             del self.last_active[username]
-        print(f"用户 {username} 已断开")
+        logger.info(f"用户 {username} 已断开")
         return True
 
     async def send_message(self, message: dict) -> bool:
@@ -59,7 +59,7 @@ class ConnectionManager:
                 await self.active_connections[target_user].send_json(message)
                 return True
             except Exception as e:
-                print(f"发送消息给 {target_user} 失败: {e}")
+                logger.error(f"发送消息给 {target_user} 失败: {e}")
                 # 连接已失效
                 await self.disconnect(target_user)
                 return False
@@ -68,7 +68,7 @@ class ConnectionManager:
             if target_user not in self.offline_messages:
                 self.offline_messages[target_user] = []
             self.offline_messages[target_user].append(message)
-            print(f"用户 {target_user} 不在线，已存储离线消息")
+            logger.warning(f"用户 {target_user} 不在线，已存储离线消息")
             return False
 
     async def get_online_users(self) -> list:
@@ -82,7 +82,7 @@ class ConnectionManager:
     async def _deliver_offline_messages(self, username: str):
         """发送用户的离线消息"""
         if username in self.offline_messages and self.offline_messages[username]:
-            print(f"向用户 {username} 发送 {len(self.offline_messages[username])} 条离线消息")
+            logger.info(f"向用户 {username} 发送 {len(self.offline_messages[username])} 条离线消息")
             for message in self.offline_messages.pop(username):
                 await self.send_message(message)
     
@@ -109,13 +109,13 @@ class ConnectionManager:
                     
                     # 检查是否超时无响应（30秒）
                     if time.time() - self.last_active.get(username, 0) > 30:
-                        print(f"用户 {username} 心跳超时，断开连接")
+                        logger.warning(f"用户 {username} 心跳超时，断开连接")
                         await self.disconnect(username)
                         break
                 except Exception as e:
-                    print(f"用户 {username} 心跳异常: {e}")
+                    logger.error(f"用户 {username} 心跳异常: {e}")
                     # 连接已断开
                     await self.disconnect(username)
                     break
         except Exception as e:
-            print(f"用户 {username} 心跳任务异常: {e}")
+            logger.error(f"用户 {username} 心跳任务异常: {e}")
