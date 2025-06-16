@@ -1,5 +1,5 @@
 from fastapi import FastAPI, WebSocket,Query,WebSocketDisconnect
-from .routers import users, test, fileUpload
+from .routers import users, test, fileUpload,emailModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.staticfiles import StaticFiles
@@ -8,14 +8,7 @@ import os.path
 from pydantic import BaseModel
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import PlainTextResponse, HTMLResponse
-import asyncio
-import json
 import time
-
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.header import Header
 
 from .connection_manager import ConnectionManager  # 导入连接管理器
 import logging
@@ -61,6 +54,7 @@ app.add_middleware(
 app.include_router(users.router)
 app.include_router(test.router)
 app.include_router(fileUpload.router)
+app.include_router(emailModel.router)
 # app.include_router(chat.router) //大模型
 
 
@@ -102,47 +96,7 @@ html = """
 @app.get("/")
 async def root():
     return HTMLResponse(html)
-
-
-@app.get("/send_email")
-def send_email():
-    """
-    发送邮件。
-    :param subject: 邮件主题
-    :param body:邮件正文
-    :param recipient:收件人邮箱地址
-    """
-
-    # 邮箱配置
-    smtp_server = "smtp.163.com"
-    smtp_port = 25
-    username = "szrwlyp@163.com"
-    # password = "szrwlyp0320..."
-    password = "RNU4nbqkU3bTEW6J"  # 授权码
-    # 接受者
-    subject = "Hello from Python!"
-    body = "测试测试"
-    recipient = "1545763981@qq.com"
-
-    # 创建MIME多部分消息
-    message = MIMEText(body, "plain", "utf-8")
-    message["From"] = username
-    message["To"] = recipient
-    message["Subject"] = subject
-
-    try:
-        # 创建SMTP对象
-        server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()
-        server.login(username, password)
-
-        # 发送邮件
-        server.sendmail(username, [recipient], message.as_string())
-        print("邮件发送成功")
-    except Exception as e:
-        print(f"邮件发送失败：{e}")
-    finally:
-        server.quit()
+    
 
 
 manager = ConnectionManager()  # 创建连接管理器实例
@@ -156,16 +110,16 @@ async def websocket_endpoint(
     WebSocket 聊天端点
     - username: 用户唯一标识（字符串）
     """
-    # 1. 连接用户
+    # 连接用户
     await manager.connect(username, websocket)
     logger.info(f"用户 {username} 已连接")
     
-    # 2. 启动心跳任务
+    # 启动心跳任务
     # heartbeat_task = asyncio.create_task(manager.heartbeat(username))
     
     try:
         while True:
-            # 3. 接收消息
+            # 接收消息
             data = await websocket.receive_json()
             logger.debug(f"收到来自 {username} 的消息: {data}")
             
@@ -203,24 +157,6 @@ async def websocket_endpoint(
                     "message_content": f"用户 {data['target_user']} 不在线",
                     "timestamp": time.time()
                 })
-                
-                # 同时发送回发送者（实现消息回显）
-                # await websocket.send_json({
-                #     "type": "message",
-                #     "name": "你",
-                #     "target_user": username,
-                #     "message_content": f"你 -> {data['target_user']}: {data['message_content']}",
-                #     "timestamp": time.time()
-                # })
-            # else:
-            #     # 无效消息格式
-            #     await websocket.send_json({
-            #         "type": "error",
-            #         "name": "system",
-            #         "target_user": username,
-            #         "message_content": "无效消息格式，请包含 type, target_user, message_content 字段",
-            #         "timestamp": time.time()
-            #     })
                 
     except WebSocketDisconnect:
         # 7. 处理断开连接
