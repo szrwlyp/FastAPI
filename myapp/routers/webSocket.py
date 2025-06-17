@@ -1,5 +1,7 @@
-from fastapi import APIRouter,WebSocket,Query,WebSocketDisconnect
+from fastapi import APIRouter,WebSocket,Query,WebSocketDisconnect,Request
 from .connection_manager import ConnectionManager  # 导入连接管理器
+from fastapi.templating import Jinja2Templates
+import os
 import time
 import asyncio
 import json
@@ -95,4 +97,25 @@ async def websocket_endpoint(websocket: WebSocket):
         data = await websocket.receive_text()
         logger.info(f"Message received: {data}")  # 打印接收到的数据
         # await websocket.send_text(f"Message text was: {data}")
+
+
+
+# 获取当前文件所在目录
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# 计算模板目录路径（假设 templates 在项目根目录）
+templates_dir = os.path.join(current_dir, "../templates")
+
+# 初始化模板引擎
+templates = Jinja2Templates(directory=templates_dir)
+
+@router.get('/webSocketPage',summary='webSocket')
+async def home_page(request: Request):
+    # 渲染模板并传递数据
+    return templates.TemplateResponse(
+        "webSocket.html",{
+            "request": request,
+            "page_title": "FastAPI 首页",
+        }
+    )
 

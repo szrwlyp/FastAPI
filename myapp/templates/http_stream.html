@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>SSE Test</title>
+    <style>
+      /* [v-cloak] {
+        display: none !important;
+      } */
+      .input-item {
+        display: flex;
+      }
+
+      .send {
+        padding: 0 10px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div v-scope class="">
+      <div class="input-item">
+        <input type="text" v-model="sseInput" class="input" />
+        <div class="send" @click="sendSSE">发送</div>
+        <div class="send" @click="cancelSSE">取消</div>
+      </div>
+      <!-- v-cloak   -->
+      <div class="message" v-html="sseMessage"></div>
+    </div>
+    <script type="module">
+      import { createApp } from "https://unpkg.com/petite-vue?module";
+      createApp({
+        sseMessage: "",
+        sseInput: "",
+        // fetchInstance: null,
+        controller: new AbortController(),
+        async sendSSE() {
+          const fetchInstance = await fetch(
+            "http://127.0.0.1:8000/http_stream",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ question: this.sseInput }),
+              signal: this.controller.signal,
+            }
+          );
+
+          if (!fetchInstance.ok) {
+            throw new Error(`HTTP error! status: ${fetchInstance.status}`);
+          }
+
+          // 获取响应体的 readable stream
+          const reader = fetchInstance.body.getReader();
+          const decoder = new TextDecoder("utf-8");
+
+          let done = false;
+          while (!done) {
+            const { value, done: readDone } = await reader.read();
+            done = readDone;
+
+            if (value) {
+              const chunk = decoder.decode(value, { stream: true });
+              const sliceChunk = chunk.slice(5).replace(/\\n/g, "");
+
+              if (sliceChunk.trim() !== "[DONE]") {
+                // 处理接收到的数据块
+                this.sseMessage += sliceChunk;
+              }
+            }
+          }
+          console.log("Stream complete");
+        },
+
+        cancelSSE() {
+          // 取消请求
+          this.controller.abort();
+        },
+      }).mount();
+    </script>
+  </body>
+</html>
