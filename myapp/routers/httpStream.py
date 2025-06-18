@@ -5,7 +5,7 @@ from pydantic import BaseModel
 import os
 import asyncio
 import random
-from ..logger import logger #日志
+from ..logger import logger  # 日志
 
 router = APIRouter()
 
@@ -19,14 +19,16 @@ templates_dir = os.path.join(current_dir, "../templates")
 # 初始化模板引擎
 templates = Jinja2Templates(directory=templates_dir)
 
-@router.get('/http_stream_page',summary='http_stream')
+
+@router.get("/http_stream_page", summary="http_stream")
 async def home_page(request: Request):
     # 渲染模板并传递数据
     return templates.TemplateResponse(
-        "http_stream.html",{
+        "httpStream.html",
+        {
             "request": request,
             "page_title": "FastAPI 首页",
-        }
+        },
     )
 
 
@@ -55,9 +57,11 @@ async def sse(request: Request):
 
     try:
         json_data = await request.json()
-        logger.info("JSON Data:", sseItem(**json_data).question)
+
+        sse_data = sseItem(**json_data)  # 自动校验并转换为对象
+        logger.info(f"打印json数据：{sse_data.question}")
     except Exception as e:
-        logger.error("JSON Data Error:", str(e))  # 如果不是 JSON 类型会报错
+        logger.error(f"JSON Data Error:{e}")  # 如果不是 JSON 类型会报错
 
     async def event_stream():
         try:
@@ -68,8 +72,8 @@ async def sse(request: Request):
                 # if event_dict["event"] == "complete":
                 #     break
         except asyncio.CancelledError as e:
-            logger.error("SSE connection was closed by the client.")
-            logger.info(e)
+            logger.error(f"SSE connection was closed by the client.")
+            logger.info(f"{e}")
             raise e
 
     return StreamingResponse(

@@ -15,12 +15,14 @@ templates_dir = os.path.join(current_dir, "../templates")
 # 初始化模板引擎
 templates = Jinja2Templates(directory=templates_dir)
 
-@router.get('/',summary='首页')
+
+@router.get("/", summary="首页")
 async def home_page(request: Request):
     # 渲染模板并传递数据
     return templates.TemplateResponse(
-        "index.html",{
+        "index.html",
+        {
             "request": request,
             "page_title": "FastAPI 首页",
-        }
+        },
     )

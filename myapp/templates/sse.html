@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Server-Sent Events 示例</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+      }
+      #events {
+        height: 300px;
+        border: 1px solid #ccc;
+        padding: 10px;
+        margin: 10px 0;
+        overflow-y: auto;
+      }
+      .event {
+        margin: 5px 0;
+      }
+      .timestamp {
+        color: #888;
+        font-size: 0.8em;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Server-Sent Events (SSE) 演示</h2>
+    <button id="connectBtn">连接SSE</button>
+    <button id="disconnectBtn" disabled>断开连接</button>
+    <div id="events"></div>
+
+    <script>
+      const eventsContainer = document.getElementById("events");
+      const connectBtn = document.getElementById("connectBtn");
+      const disconnectBtn = document.getElementById("disconnectBtn");
+      let eventSource;
+
+      // 连接SSE
+      connectBtn.addEventListener("click", () => {
+        // 使用模拟事件流（实际应用应替换为真实URL）
+        eventSource = new EventSource(
+          "http://127.0.0.1:8000/sse?user_id=lanyuping"
+        );
+        console.log(eventSource);
+        eventSource.onopen = () => {
+          addEvent("SSE连接已建立");
+          connectBtn.disabled = true;
+          disconnectBtn.disabled = false;
+        };
+
+        // 监听常规消息
+        eventSource.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+          addEvent(`消息: ${data.message}`, "message");
+        };
+
+        // 监听自定义事件
+        eventSource.addEventListener("statusUpdate", (event) => {
+          const data = JSON.parse(event.data);
+          addEvent(`状态更新: ${data.status} (${data.value}%)`, "status");
+        });
+
+        eventSource.onerror = () => {
+          addEvent("连接错误", "error");
+          eventSource.close();
+          resetButtons();
+        };
+      });
+
+      // 断开连接
+      disconnectBtn.addEventListener("click", () => {
+        if (eventSource) {
+          eventSource.close();
+          addEvent("连接已手动关闭");
+          resetButtons();
+        }
+      });
+
+      // 添加事件到显示区域
+      function addEvent(text, type = "info") {
+        const eventElement = document.createElement("div");
+        eventElement.className = `event ${type}`;
+
+        const timestamp = new Date().toLocaleTimeString();
+        eventElement.innerHTML = `<span class="timestamp">[${timestamp}]</span> ${text}`;
+
+        eventsContainer.appendChild(eventElement);
+        eventsContainer.scrollTop = eventsContainer.scrollHeight;
+      }
+
+      function resetButtons() {
+        connectBtn.disabled = false;
+        disconnectBtn.disabled = true;
+      }
+    </script>
+  </body>
+</html>
